@@ -1,9 +1,6 @@
 -- ============================================================
 -- IRRIGASMART - BANCO DE DADOS
--- PostgreSQL
--- VERSÃO FINAL PARA PROJETO ACADÊMICO
 -- ============================================================
-
 
 -- ============================================================
 -- 1. LIMPEZA
@@ -42,13 +39,6 @@ CREATE TABLE users (
 -- ============================================================
 -- 3. PROPRIEDADE
 -- ============================================================
---
--- A propriedade é cadastrada depois da criação da conta.
---
--- O mesmo registro é utilizado posteriormente pela tela
--- "Configurações > Minha propriedade".
---
--- ============================================================
 
 CREATE TABLE properties (
     id SERIAL PRIMARY KEY,
@@ -85,7 +75,6 @@ CREATE TABLE properties (
 -- ============================================================
 -- 4. ESP32 / DISPOSITIVO
 -- ============================================================
---
 -- online:
 -- TRUE  = ESP32 conectado
 -- FALSE = ESP32 desconectado
@@ -93,7 +82,6 @@ CREATE TABLE properties (
 -- irrigation_on:
 -- TRUE  = irrigação ligada
 -- FALSE = irrigação desligada
---
 -- ============================================================
 
 CREATE TABLE devices (
@@ -169,11 +157,6 @@ CREATE TABLE sensor_readings (
 --
 -- Cada registro representa um período em que a irrigação
 -- ficou ligada.
---
--- Não existe "automático", "manual", "completed", etc.
---
--- O estado atual fica em devices.irrigation_on.
---
 -- ============================================================
 
 CREATE TABLE irrigation_events (
@@ -262,7 +245,6 @@ ON irrigation_events(device_id, started_at);
 -- - menor consumo
 -- - média
 -- - período personalizado
---
 -- ============================================================
 
 CREATE VIEW daily_consumption AS
@@ -529,16 +511,6 @@ FROM generate_series(
 
 -- ============================================================
 -- 17. LEITURAS DE VAZÃO
--- ============================================================
---
--- A irrigação de hoje ocorre das 09:00 às 10:00.
---
--- Durante a irrigação:
--- aproximadamente 10 L/min
---
--- Fora da irrigação:
--- 0 L/min
---
 -- ============================================================
 
 INSERT INTO sensor_readings (
