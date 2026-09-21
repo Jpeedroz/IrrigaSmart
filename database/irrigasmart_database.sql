@@ -6,102 +6,111 @@
 -- 1. LIMPEZA
 -- ============================================================
 
-DROP VIEW IF EXISTS dashboard_summary;
-DROP VIEW IF EXISTS daily_consumption;
+DROP VIEW IF EXISTS resumo_dashboard;
+DROP VIEW IF EXISTS consumo_diario;
 
-DROP TABLE IF EXISTS sensor_readings CASCADE;
-DROP TABLE IF EXISTS sensors CASCADE;
-DROP TABLE IF EXISTS irrigation_events CASCADE;
-DROP TABLE IF EXISTS devices CASCADE;
-DROP TABLE IF EXISTS properties CASCADE;
-DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS leituras_sensores CASCADE;
+DROP TABLE IF EXISTS sensores CASCADE;
+DROP TABLE IF EXISTS eventos_irrigacao CASCADE;
+DROP TABLE IF EXISTS dispositivos CASCADE;
+DROP TABLE IF EXISTS propriedades CASCADE;
+DROP TABLE IF EXISTS usuarios CASCADE;
 
 
 -- ============================================================
 -- 2. USUÁRIOS
 -- ============================================================
 
-CREATE TABLE users (
+CREATE TABLE usuarios (
     id SERIAL PRIMARY KEY,
 
     name VARCHAR(100) NOT NULL,
 
     email VARCHAR(150) UNIQUE NOT NULL,
 
-    password_hash TEXT NOT NULL,
+    senha_hash TEXT NOT NULL,
 
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 
 -- ============================================================
 -- 3. PROPRIEDADE
 -- ============================================================
+--
+-- A propriedade é cadastrada depois da criação da conta.
+--
+-- O mesmo registro é utilizado posteriormente pela tela
+-- "Configurações > Minha propriedade".
+--
+-- ============================================================
 
-CREATE TABLE properties (
+CREATE TABLE propriedades (
     id SERIAL PRIMARY KEY,
 
-    user_id INTEGER NOT NULL
-        REFERENCES users(id)
+    usuario_id INTEGER NOT NULL
+        REFERENCES usuarios(id)
         ON DELETE CASCADE,
 
     name VARCHAR(100) NOT NULL,
 
-    location VARCHAR(150),
+    localizacao VARCHAR(150),
 
     area_hectares NUMERIC(10,2)
         CHECK (area_hectares >= 0),
 
-    crop VARCHAR(100),
+    cultura VARCHAR(100),
 
-    irrigation_method VARCHAR(50) NOT NULL
+    metodo_irrigacao VARCHAR(50) NOT NULL
         DEFAULT 'Bomba d''água',
 
-    moisture_limit NUMERIC(5,2) NOT NULL
+    limite_umidade NUMERIC(5,2) NOT NULL
         DEFAULT 35.00
         CHECK (
-            moisture_limit >= 0
-            AND moisture_limit <= 100
+            limite_umidade >= 0
+            AND limite_umidade <= 100
         ),
 
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 
 -- ============================================================
 -- 4. ESP32 / DISPOSITIVO
 -- ============================================================
+--
 -- online:
 -- TRUE  = ESP32 conectado
 -- FALSE = ESP32 desconectado
 --
--- irrigation_on:
+-- irrigacao_ligada:
 -- TRUE  = irrigação ligada
 -- FALSE = irrigação desligada
+--
 -- ============================================================
 
-CREATE TABLE devices (
+CREATE TABLE dispositivos (
     id SERIAL PRIMARY KEY,
 
-    property_id INTEGER NOT NULL
-        REFERENCES properties(id)
+    propriedade_id INTEGER NOT NULL
+        REFERENCES propriedades(id)
         ON DELETE CASCADE,
 
-    device_code VARCHAR(50) UNIQUE NOT NULL,
+    codigo_dispositivo VARCHAR(50) UNIQUE NOT NULL,
 
     name VARCHAR(100) NOT NULL,
 
     online BOOLEAN NOT NULL DEFAULT FALSE,
 
-    irrigation_on BOOLEAN NOT NULL DEFAULT FALSE,
+    irrigacao_ligada BOOLEAN NOT NULL DEFAULT FALSE,
 
-    last_seen TIMESTAMP,
+    ultimo_sinal TIMESTAMP,
 
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 
@@ -109,19 +118,19 @@ CREATE TABLE devices (
 -- 5. SENSORES
 -- ============================================================
 
-CREATE TABLE sensors (
+CREATE TABLE sensores (
     id SERIAL PRIMARY KEY,
 
-    device_id INTEGER NOT NULL
-        REFERENCES devices(id)
+    dispositivo_id INTEGER NOT NULL
+        REFERENCES dispositivos(id)
         ON DELETE CASCADE,
 
     type VARCHAR(30) NOT NULL
         CHECK (
             type IN (
-                'soil_moisture',
+                'umidade_solo',
                 'temperature',
-                'water_flow'
+                'vazao_agua'
             )
         ),
 
@@ -129,7 +138,7 @@ CREATE TABLE sensors (
 
     unit VARCHAR(20) NOT NULL,
 
-    UNIQUE(device_id, type)
+    UNIQUE(dispositivo_id, type)
 );
 
 
@@ -137,16 +146,16 @@ CREATE TABLE sensors (
 -- 6. LEITURAS DOS SENSORES
 -- ============================================================
 
-CREATE TABLE sensor_readings (
+CREATE TABLE leituras_sensores (
     id SERIAL PRIMARY KEY,
 
     sensor_id INTEGER NOT NULL
-        REFERENCES sensors(id)
+        REFERENCES sensores(id)
         ON DELETE CASCADE,
 
     value NUMERIC(10,2) NOT NULL,
 
-    reading_time TIMESTAMP NOT NULL
+    hora_leitura TIMESTAMP NOT NULL
         DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -157,50 +166,55 @@ CREATE TABLE sensor_readings (
 --
 -- Cada registro representa um período em que a irrigação
 -- ficou ligada.
+--
+-- Não existe "automático", "manual", "completed", etc.
+--
+-- O estado atual fica em dispositivos.irrigacao_ligada.
+--
 -- ============================================================
 
-CREATE TABLE irrigation_events (
+CREATE TABLE eventos_irrigacao (
     id SERIAL PRIMARY KEY,
 
-    device_id INTEGER NOT NULL
-        REFERENCES devices(id)
+    dispositivo_id INTEGER NOT NULL
+        REFERENCES dispositivos(id)
         ON DELETE CASCADE,
 
-    started_at TIMESTAMP NOT NULL,
+    iniciado_em TIMESTAMP NOT NULL,
 
-    ended_at TIMESTAMP,
+    encerrado_em TIMESTAMP,
 
-    duration_minutes INTEGER
+    duracao_minutos INTEGER
         CHECK (
-            duration_minutes IS NULL
-            OR duration_minutes >= 0
+            duracao_minutos IS NULL
+            OR duracao_minutos >= 0
         ),
 
-    water_used_liters NUMERIC(10,2) NOT NULL
+    agua_utilizada_litros NUMERIC(10,2) NOT NULL
         DEFAULT 0
-        CHECK (water_used_liters >= 0),
+        CHECK (agua_utilizada_litros >= 0),
 
-    moisture_before NUMERIC(5,2)
+    umidade_antes NUMERIC(5,2)
         CHECK (
-            moisture_before IS NULL
+            umidade_antes IS NULL
             OR (
-                moisture_before >= 0
-                AND moisture_before <= 100
+                umidade_antes >= 0
+                AND umidade_antes <= 100
             )
         ),
 
-    moisture_after NUMERIC(5,2)
+    umidade_depois NUMERIC(5,2)
         CHECK (
-            moisture_after IS NULL
+            umidade_depois IS NULL
             OR (
-                moisture_after >= 0
-                AND moisture_after <= 100
+                umidade_depois >= 0
+                AND umidade_depois <= 100
             )
         ),
 
     CHECK (
-        ended_at IS NULL
-        OR ended_at >= started_at
+        encerrado_em IS NULL
+        OR encerrado_em >= iniciado_em
     )
 );
 
@@ -210,19 +224,19 @@ CREATE TABLE irrigation_events (
 -- ============================================================
 
 CREATE INDEX idx_properties_user
-ON properties(user_id);
+ON propriedades(usuario_id);
 
 CREATE INDEX idx_devices_property
-ON devices(property_id);
+ON dispositivos(propriedade_id);
 
 CREATE INDEX idx_sensors_device
-ON sensors(device_id);
+ON sensores(dispositivo_id);
 
 CREATE INDEX idx_sensor_readings_sensor_time
-ON sensor_readings(sensor_id, reading_time);
+ON leituras_sensores(sensor_id, hora_leitura);
 
 CREATE INDEX idx_irrigation_events_device_date
-ON irrigation_events(device_id, started_at);
+ON eventos_irrigacao(dispositivo_id, iniciado_em);
 
 
 -- ============================================================
@@ -245,38 +259,39 @@ ON irrigation_events(device_id, started_at);
 -- - menor consumo
 -- - média
 -- - período personalizado
+--
 -- ============================================================
 
-CREATE VIEW daily_consumption AS
+CREATE VIEW consumo_diario AS
 
 SELECT
-    d.property_id,
+    d.propriedade_id,
 
-    DATE(e.started_at) AS consumption_date,
+    DATE(e.iniciado_em) AS data_consumo,
 
     ROUND(
-        SUM(e.water_used_liters),
+        SUM(e.agua_utilizada_litros),
         2
-    ) AS water_used_liters
+    ) AS agua_utilizada_litros
 
-FROM irrigation_events e
+FROM eventos_irrigacao e
 
-JOIN devices d
-    ON d.id = e.device_id
+JOIN dispositivos d
+    ON d.id = e.dispositivo_id
 
 GROUP BY
-    d.property_id,
-    DATE(e.started_at);
+    d.propriedade_id,
+    DATE(e.iniciado_em);
 
 
 -- ============================================================
 -- 10. USUÁRIO DE TESTE
 -- ============================================================
 
-INSERT INTO users (
+INSERT INTO usuarios (
     name,
     email,
-    password_hash
+    senha_hash
 )
 VALUES (
     'João Pereira',
@@ -289,14 +304,14 @@ VALUES (
 -- 11. PROPRIEDADE DE TESTE
 -- ============================================================
 
-INSERT INTO properties (
-    user_id,
+INSERT INTO propriedades (
+    usuario_id,
     name,
-    location,
+    localizacao,
     area_hectares,
-    crop,
-    irrigation_method,
-    moisture_limit
+    cultura,
+    metodo_irrigacao,
+    limite_umidade
 )
 VALUES (
     1,
@@ -313,13 +328,13 @@ VALUES (
 -- 12. ESP32 DE TESTE
 -- ============================================================
 
-INSERT INTO devices (
-    property_id,
-    device_code,
+INSERT INTO dispositivos (
+    propriedade_id,
+    codigo_dispositivo,
     name,
     online,
-    irrigation_on,
-    last_seen
+    irrigacao_ligada,
+    ultimo_sinal
 )
 VALUES (
     1,
@@ -335,8 +350,8 @@ VALUES (
 -- 13. SENSORES DE TESTE
 -- ============================================================
 
-INSERT INTO sensors (
-    device_id,
+INSERT INTO sensores (
+    dispositivo_id,
     type,
     name,
     unit
@@ -344,7 +359,7 @@ INSERT INTO sensors (
 VALUES
 (
     1,
-    'soil_moisture',
+    'umidade_solo',
     'Sensor de Umidade',
     '%'
 ),
@@ -356,24 +371,24 @@ VALUES
 ),
 (
     1,
-    'water_flow',
+    'vazao_agua',
     'Sensor de Vazão',
     'L/min'
 );
 
 
 -- ============================================================
--- 14. HISTÓRICO DE IRRIGAÇÕES
+-- 14. HISTÓRICO DE IRRIGAÇÕES TESTE
 -- ============================================================
 
-INSERT INTO irrigation_events (
-    device_id,
-    started_at,
-    ended_at,
-    duration_minutes,
-    water_used_liters,
-    moisture_before,
-    moisture_after
+INSERT INTO eventos_irrigacao (
+    dispositivo_id,
+    iniciado_em,
+    encerrado_em,
+    duracao_minutos,
+    agua_utilizada_litros,
+    umidade_antes,
+    umidade_depois
 )
 VALUES
 
@@ -456,13 +471,13 @@ VALUES
 
 
 -- ============================================================
--- 15. LEITURAS DE UMIDADE
+-- 15. LEITURAS DE UMIDADE DE TESTE
 -- ============================================================
 
-INSERT INTO sensor_readings (
+INSERT INTO leituras_sensores (
     sensor_id,
     value,
-    reading_time
+    hora_leitura
 )
 
 SELECT
@@ -483,13 +498,13 @@ FROM generate_series(
 
 
 -- ============================================================
--- 16. LEITURAS DE TEMPERATURA
+-- 16. LEITURAS DE TEMPERATURA DE TESTE
 -- ============================================================
 
-INSERT INTO sensor_readings (
+INSERT INTO leituras_sensores (
     sensor_id,
     value,
-    reading_time
+    hora_leitura
 )
 
 SELECT
@@ -510,13 +525,23 @@ FROM generate_series(
 
 
 -- ============================================================
--- 17. LEITURAS DE VAZÃO
+-- 17. LEITURAS DE VAZÃO DE TESTE
+-- ============================================================
+--
+-- A irrigação de hoje ocorre das 09:00 às 10:00.
+--
+-- Durante a irrigação:
+-- aproximadamente 10 L/min
+--
+-- Fora da irrigação:
+-- 0 L/min
+--
 -- ============================================================
 
-INSERT INTO sensor_readings (
+INSERT INTO leituras_sensores (
     sensor_id,
     value,
-    reading_time
+    hora_leitura
 )
 VALUES
 (
@@ -545,74 +570,74 @@ VALUES
 -- 18. VIEW RESUMIDA DO DASHBOARD
 -- ============================================================
 
-CREATE VIEW dashboard_summary AS
+CREATE VIEW resumo_dashboard AS
 
 SELECT
 
-    u.id AS user_id,
+    u.id AS usuario_id,
     u.name AS user_name,
 
-    p.id AS property_id,
+    p.id AS propriedade_id,
     p.name AS property_name,
-    p.location,
+    p.localizacao,
     p.area_hectares,
-    p.crop,
-    p.irrigation_method,
-    p.moisture_limit,
+    p.cultura,
+    p.metodo_irrigacao,
+    p.limite_umidade,
 
-    d.id AS device_id,
-    d.device_code,
+    d.id AS dispositivo_id,
+    d.codigo_dispositivo,
     d.online,
-    d.irrigation_on,
-    d.last_seen,
+    d.irrigacao_ligada,
+    d.ultimo_sinal,
 
     (
         SELECT sr.value
-        FROM sensor_readings sr
+        FROM leituras_sensores sr
 
-        JOIN sensors s
+        JOIN sensores s
             ON s.id = sr.sensor_id
 
-        WHERE s.device_id = d.id
-          AND s.type = 'soil_moisture'
+        WHERE s.dispositivo_id = d.id
+          AND s.type = 'umidade_solo'
 
-        ORDER BY sr.reading_time DESC
+        ORDER BY sr.hora_leitura DESC
 
         LIMIT 1
-    ) AS current_moisture,
+    ) AS umidade_atual,
 
     (
         SELECT sr.value
-        FROM sensor_readings sr
+        FROM leituras_sensores sr
 
-        JOIN sensors s
+        JOIN sensores s
             ON s.id = sr.sensor_id
 
-        WHERE s.device_id = d.id
+        WHERE s.dispositivo_id = d.id
           AND s.type = 'temperature'
 
-        ORDER BY sr.reading_time DESC
+        ORDER BY sr.hora_leitura DESC
 
         LIMIT 1
-    ) AS current_temperature,
+    ) AS temperatura_atual,
 
     COALESCE(
         (
-            SELECT SUM(e.water_used_liters)
+            SELECT SUM(e.agua_utilizada_litros)
 
-            FROM irrigation_events e
+            FROM eventos_irrigacao e
 
-            WHERE e.device_id = d.id
+            WHERE e.dispositivo_id = d.id
 
-              AND DATE(e.started_at) = CURRENT_DATE
+              AND DATE(e.iniciado_em) = CURRENT_DATE
         ),
         0
-    ) AS today_water_consumption
+    ) AS consumo_agua_hoje
 
-FROM users u
+FROM usuarios u
 
-JOIN properties p
-    ON p.user_id = u.id
+JOIN propriedades p
+    ON p.usuario_id = u.id
 
-JOIN devices d
-    ON d.property_id = p.id;
+JOIN dispositivos d
+    ON d.propriedade_id = p.id;
